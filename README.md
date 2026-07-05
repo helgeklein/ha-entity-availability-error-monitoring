@@ -25,7 +25,7 @@ Clone the repository into a subdirectory of your Home Assistant configuration di
 <your-ha-config>/monitoring/
 ```
 
-The build script reads its source files from there and writes the finished package to:
+The build script (see below) reads its source files from there and writes the finished package to:
 
 ```text
 <your-ha-config>/packages/monitoring.yaml
@@ -62,7 +62,7 @@ After that, `monitoring/private/` should contain these files:
 - `input_text.yaml`
 - `input_select.yaml`
 
-These are your own local files. This is where you configure what to monitor and where notifications should be sent to.
+This is where you configure what to monitor and where notifications should be sent to.
 
 ### 5. Define the sensors that should be monitored
 
@@ -75,8 +75,8 @@ Replace the example entries with your own template binary sensors.
 
 The idea is simple:
 
-- availability sensors answer: is this device or entity offline?
-- error sensors answer: is this device currently reporting a problem?
+- Availability sensors answer: is this device or entity offline?
+- Error sensors answer: is this device currently reporting a problem?
 
 ### 6. Choose which of those sensors should trigger notifications
 
@@ -89,7 +89,7 @@ Only sensors listed in these groups will be monitored.
 
 ### 7. Create a Home Assistant notification group
 
-Create a notify group in `configuration.yaml`. Example:
+Create a [notify group](https://www.home-assistant.io/integrations/group#notify-groups) in `configuration.yaml`. Example:
 
 ```yaml
 notify:
@@ -100,6 +100,8 @@ notify:
       - action: mobile_app_phone_1
       - action: mobile_app_phone_2
 ```
+
+To find the correct mobile phone IDs, open Home Assistant and go to **Developer Tools** > **Actions**. Search for `mobile_app_` and look for services such as `notify.mobile_app_phone_name`. Use the service suffix shown there in the group definition (e.g., `phone_name`).
 
 ### 8. Choose notification target and language
 
@@ -115,7 +117,7 @@ Set:
 
 ### 9. Build the Home Assistant package
 
-Run this command from your Home Assistant config folder:
+Run the following command to build the monitoring package with all definitions for Home Assistant:
 
 ```text
 py -3 "\\HA-MACHINE\config\monitoring\build_monitoring.py" --root .
