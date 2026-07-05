@@ -157,6 +157,19 @@ script:
           data:
             tag: "{{ notification_id }}"
 
+input_text:
+    monitoring_test_availability:
+        name: "Monitoring: Test Availability Source"
+        initial: "on"
+        min: 0
+        max: 100
+
+    monitoring_test_error_code:
+        name: "Monitoring: Test Error Code"
+        initial: "0"
+        min: 0
+        max: 100
+
 template:
     - binary_sensor: !include $availability_include
     - binary_sensor: !include $error_include

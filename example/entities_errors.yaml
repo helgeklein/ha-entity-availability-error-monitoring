@@ -49,3 +49,31 @@
     source_description: "{{ source_description }}"
     source_error_code: "{{ states(source_entity) }}"
   device_class: problem
+
+- name: "Test Entity: Error"
+  unique_id: test_entity_error
+  variables:
+    source_entity: input_text.monitoring_test_error_code
+    source_name: "Test Entity"
+    source_description: "Self-contained error test entity. In Home Assistant Developer Tools > States, set input_text.monitoring_test_error_code to a non-zero value such as E1 to trigger an alert. Set it to 0 or an empty value to test recovery."
+    ok_values:
+      - ""
+      - "0"
+  availability: "{{ states(source_entity) != 'unavailable' }}"
+  state: >-
+    {% set raw_value = states(source_entity) %}
+    {% if raw_value in ['unknown', 'none'] %}
+      {{ none }}
+    {% else %}
+      {{ raw_value not in ok_values }}
+    {% endif %}
+  attributes:
+    raw_value: "{{ states(source_entity) }}"
+    source_name: >-
+      {{ source_name
+         or device_attr(source_entity, 'name')
+         or state_attr(source_entity, 'friendly_name')
+         or source_entity }}
+    source_description: "{{ source_description }}"
+    source_error_code: "{{ states(source_entity) }}"
+  device_class: problem

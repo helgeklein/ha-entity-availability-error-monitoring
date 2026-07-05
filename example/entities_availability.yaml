@@ -58,3 +58,17 @@
     source_name: *template_source_name
     source_description: *template_source_description
   device_class: *connectivity_device_class
+
+- name: "Test Entity: Availability"
+  unique_id: test_entity_availability
+  variables:
+    source_entity: input_text.monitoring_test_availability
+    source_name: "Test Entity"
+    source_description: "Self-contained availability test entity. In Home Assistant Developer Tools > States, set input_text.monitoring_test_availability to 'unavailable' to trigger an alert. Set it to 'on' or 'off' to test recovery."
+  availability: "{{ states(source_entity) != 'unavailable' }}"
+  state: "{{ true }}"
+  attributes:
+    raw_value: "{{ states(source_entity) }}"
+    source_name: *template_source_name
+    source_description: *template_source_description
+  device_class: *connectivity_device_class

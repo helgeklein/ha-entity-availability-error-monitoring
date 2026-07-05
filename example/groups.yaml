@@ -15,8 +15,10 @@ monitoring_entity_availability:
   entities:
     - binary_sensor.network_switch_availability
     - binary_sensor.heat_pump_availability
+    - binary_sensor.test_entity_availability
 
 monitoring_entity_errors:
   name: "Monitoring: Entity Errors"
   entities:
     - binary_sensor.heat_pump_error
+    - binary_sensor.test_entity_error

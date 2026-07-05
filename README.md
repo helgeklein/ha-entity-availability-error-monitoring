@@ -19,9 +19,7 @@ Home Assistant entity availability and error monitoring & alerting through nativ
 
 ### 1. Put the project into your Home Assistant config folder
 
-Clone the repository into a subdirectory of your Home Assistant configuration directory (e.g., `config/monitoring`).
-
-Example:
+Clone the repository into a subdirectory of your Home Assistant configuration directory (e.g., `config/monitoring`). Example:
 
 ```text
 <your-ha-config>/monitoring/
@@ -80,22 +78,30 @@ The idea is simple:
 - availability sensors answer: is this device or entity offline?
 - error sensors answer: is this device currently reporting a problem?
 
-Do not list random raw entities here. Create wrapper sensors that describe the situation clearly and provide readable metadata such as:
-
-- `source_name`
-- `source_description`
-- `source_error_code` for error sensors
-
 ### 6. Choose which of those sensors should trigger notifications
 
-Open `groups.yaml` and add your wrapper sensors to the right groups:
+Open `groups.yaml` and add the wrapper sensors from the previous step to the right groups:
 
-- `monitoring_entity_availability` for offline/unavailable monitoring
+- `monitoring_entity_availability` for availability monitoring
 - `monitoring_entity_errors` for error-state monitoring
 
 Only sensors listed in these groups will be monitored.
 
-### 7. Choose notification target and language
+### 7. Create a Home Assistant notification group
+
+Create a notify group in `configuration.yaml`. Example:
+
+```yaml
+notify:
+  # This creates the notify group: notify.all_devices
+  - name: "All Devices"
+    platform: group
+    services:
+      - action: mobile_app_phone_1
+      - action: mobile_app_phone_2
+```
+
+### 8. Choose notification target and language
 
 Open these two files:
 
@@ -104,15 +110,15 @@ Open these two files:
 
 Set:
 
-- the Home Assistant notify target or notify group that should receive alerts
+- the Home Assistant notify target or notify group that should receive alerts (use the suffix only: `all_devices` in the example above) 
 - the language for user-facing messages (`en` or `de`)
 
-### 8. Build the Home Assistant package
+### 9. Build the Home Assistant package
 
 Run this command from your Home Assistant config folder:
 
 ```text
-py -3 monitoring/build_monitoring.py --root .
+py -3 "\\HA-MACHINE\config\monitoring\build_monitoring.py" --root .
 ```
 
 This creates or updates:
@@ -121,25 +127,75 @@ This creates or updates:
 packages/monitoring.yaml
 ```
 
-### 9. Reload or restart Home Assistant
+### 10. Reload or restart Home Assistant
 
 After the package has been generated, reload your YAML configuration or restart Home Assistant.
 
 If everything is set up correctly, Home Assistant will start monitoring the sensors you added to the two monitoring groups.
 
-## Quick Validation
+## Test
 
-To check whether the generated package is already up to date without rewriting it:
+The example configuration includes two built-in test entities:
 
-```
-py -3 monitoring/build_monitoring.py --root <path-to-home-assistant-config> --check
-```
+- `binary_sensor.test_entity_availability`
+- `binary_sensor.test_entity_error`
 
-Expected success output:
+These test entities use two helper inputs that are created by the generated package:
 
-```text
-Up to date: <path-to-home-assistant-config>/packages/monitoring.yaml
-```
+- `input_text.monitoring_test_availability`
+- `input_text.monitoring_test_error_code`
+
+You can change those helper values in Home Assistant Developer Tools to check whether notifications are working.
+
+### Test availability monitoring
+
+1. Open Home Assistant.
+2. Go to **Developer Tools** > **States**.
+3. Find `input_text.monitoring_test_availability`.
+4. Set its state to `unavailable`.
+5. Wait 5 minutes.
+
+Expected result:
+
+- `binary_sensor.test_entity_availability` becomes unavailable.
+- A persistent notification is created in Home Assistant.
+- A notify-based alert is sent to your configured notification target.
+
+To test recovery:
+
+1. Set `input_text.monitoring_test_availability` to `on` or `off`.
+2. Wait a moment for Home Assistant to update the template entity.
+
+Expected result:
+
+- the availability notification is dismissed
+- the matching mobile notification is cleared
+
+### Test error monitoring
+
+1. Open Home Assistant.
+2. Go to **Developer Tools** > **States**.
+3. Find `input_text.monitoring_test_error_code`.
+4. Set its state to a non-zero value such as `E1`.
+
+Expected result:
+
+- `binary_sensor.test_entity_error` turns on
+- a persistent notification is created in Home Assistant
+- a notify-based alert is sent to your configured notification target
+
+To test recovery:
+
+1. Set `input_text.monitoring_test_error_code` to `0` or an empty value.
+2. Wait a moment for Home Assistant to update the template entity.
+
+Expected result:
+
+- `binary_sensor.test_entity_error` turns off
+- the error notification is dismissed
+- the matching mobile notification is cleared
+
+If these tests do not trigger anything, check that the two test entities are listed in `groups.yaml`, then rebuild the package and reload or restart Home Assistant.
 
 ## Key Concepts
 
@@ -157,7 +213,7 @@ These wrapper entities also provide user-facing metadata such as:
 - `source_description`
 - `source_error_code` for error sensors
 
-This adapter layer is what makes the solution portable across very different devices and integrations.
+This adapter layer is what makes the solution flexible to use with different kinds of source entities.
 
 ### Entity groups
 
