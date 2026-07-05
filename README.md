@@ -15,6 +15,8 @@ Home Assistant entity availability and error monitoring & alerting through nativ
    - Mobile and 3rd-party notifications via HA notification groups
 - Multi-language support for end-user facing messages
 
+See [this blog post](https://helgeklein.com/blog/home-assistant-entity-availability-and-error-monitoring/) for a high-level architecture overview and for some things I learned while implementing this solution.
+
 ## Installation
 
 ### 1. Put the project into your Home Assistant config folder
