@@ -8,6 +8,15 @@
 # you translate raw Home Assistant entities into clear monitoring signals with
 # user-friendly metadata such as a display name and description.
 #
+# Expected variables:
+# - source_entity:
+#   The Home Assistant entity whose availability you want to monitor.
+# - source_name:
+#   A short human-readable name shown in notifications.
+# - source_description:
+#   A longer explanation of what is being monitored and what it means if it is
+#   unavailable.
+#
 # Copy this file to ../private/entities_availability.yaml and replace the
 # example sensors with template binary sensors for your own devices or
 # integrations.

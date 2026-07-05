@@ -8,6 +8,17 @@
 # simple on/off monitoring signal and provide readable metadata for generated
 # notifications.
 #
+# Expected variables:
+# - source_entity:
+#   The Home Assistant entity that provides the raw error code or error state.
+# - source_name:
+#   A short human-readable name shown in notifications.
+# - source_description:
+#   A longer explanation of what is being monitored.
+# - ok_values:
+#   A list of raw values that should be treated as "no error". Any other value
+#   is considered an active error.
+#
 # Copy this file to ../private/entities_errors.yaml and replace the example
 # sensors with template binary sensors for your own devices or integrations.
 
