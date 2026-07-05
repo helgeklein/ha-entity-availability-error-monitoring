@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import tempfile
@@ -11,9 +12,15 @@ from string import Template
 try:
     import yaml
 except ImportError as exc:  # pragma: no cover - import guard for target machines
+    project_dir_name = Path(__file__).resolve().parent.name
     raise SystemExit(
-        "PyYAML is required. Install it with: pip install -r monitoring/requirements.txt"
+        f"PyYAML is required. Install it with: pip install -r {project_dir_name}/requirements.txt"
     ) from exc
+
+
+PROJECT_DIR = Path(__file__).resolve().parent
+PROJECT_DIR_NAME = PROJECT_DIR.name
+DEFAULT_PRIVATE_DIR = Path(PROJECT_DIR_NAME) / "private"
 
 
 TRANSLATIONS = {
@@ -82,12 +89,7 @@ MONITORING_TEMPLATE = Template(
 # GENERATED FILE. DO NOT EDIT MANUALLY.
 #
 # Source inputs:
-# - monitoring/private/groups.yaml
-# - monitoring/private/input_text.yaml
-# - monitoring/private/input_select.yaml
-# - monitoring/private/entities_availability.yaml
-# - monitoring/private/entities_errors.yaml
-# - monitoring/build_monitoring.py
+$source_inputs
 #
 
 ######################################################################
@@ -156,8 +158,8 @@ script:
             tag: "{{ notification_id }}"
 
 template:
-  - binary_sensor: !include ../monitoring/private/entities_availability.yaml
-  - binary_sensor: !include ../monitoring/private/entities_errors.yaml
+    - binary_sensor: !include $availability_include
+    - binary_sensor: !include $error_include
 """
 )
 
@@ -172,13 +174,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--root",
         type=Path,
-        default=Path(__file__).resolve().parents[1],
+        default=PROJECT_DIR.parent,
         help="Path to the Home Assistant config root. UNC/SMB paths are supported.",
     )
     parser.add_argument(
         "--private-dir",
         type=Path,
-        default=Path("monitoring") / "private",
+        default=DEFAULT_PRIVATE_DIR,
         help="Private monitoring config directory, relative to --root unless absolute.",
     )
     parser.add_argument(
@@ -215,6 +217,23 @@ def indent_block(text: str, indent: int) -> str:
 
 def resolve_under_root(root: Path, path: Path) -> Path:
     return path if path.is_absolute() else root / path
+
+
+def relative_posix_path(path: Path, start: Path) -> str:
+    try:
+        return Path(os.path.relpath(path, start)).as_posix()
+    except ValueError as exc:
+        raise SystemExit(
+            f"Cannot express path '{path}' relative to '{start}'. "
+            "Ensure the generated package and private config are reachable from the same filesystem root."
+        ) from exc
+
+
+def comment_path(path: Path, root: Path) -> str:
+    try:
+        return path.relative_to(root).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def read_yaml_document(path: Path):
@@ -524,7 +543,7 @@ def render_error_automation(entities: list[str], notify_group: str, t: dict[str,
 '''
 
 
-def build_package(root: Path, private_dir: Path) -> str:
+def build_package(root: Path, private_dir: Path, output_path: Path) -> str:
     groups_path = private_dir / "groups.yaml"
     input_text_path = private_dir / "input_text.yaml"
     input_select_path = private_dir / "input_select.yaml"
@@ -555,9 +574,26 @@ def build_package(root: Path, private_dir: Path) -> str:
     if not availability_automation and not error_automation:
         raise SystemExit("No monitoring automations were generated. At least one monitored entity group must contain entities.")
 
+    source_inputs = "\n".join(
+        [
+            f"# - {comment_path(groups_path, root)}",
+            f"# - {comment_path(input_text_path, root)}",
+            f"# - {comment_path(input_select_path, root)}",
+            f"# - {comment_path(availability_entities_path, root)}",
+            f"# - {comment_path(error_entities_path, root)}",
+            f"# - {comment_path(PROJECT_DIR / 'build_monitoring.py', root)}",
+        ]
+    )
+    output_dir = output_path.parent
+    availability_include = relative_posix_path(availability_entities_path, output_dir)
+    error_include = relative_posix_path(error_entities_path, output_dir)
+
     return MONITORING_TEMPLATE.substitute(
         availability_automation=availability_automation,
         error_automation=error_automation,
+        source_inputs=source_inputs,
+        availability_include=availability_include,
+        error_include=error_include,
     )
 
 
@@ -598,7 +634,7 @@ def main() -> int:
     if not private_dir.exists():
         raise SystemExit(f"Private monitoring config directory does not exist: {private_dir}")
 
-    content = build_package(root, private_dir)
+    content = build_package(root, private_dir, output_path)
 
     if args.dry_run:
         sys.stdout.write(content)
