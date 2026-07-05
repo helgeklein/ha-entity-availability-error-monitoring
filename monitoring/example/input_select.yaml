@@ -1,0 +1,6 @@
+monitoring_language:
+  name: "Monitoring: Language"
+  options:
+    - en
+    - de
+  initial: en

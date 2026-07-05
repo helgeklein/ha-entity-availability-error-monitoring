@@ -1,0 +1,27 @@
+- name: "Heat Pump: Error"
+  unique_id: heat_pump_error
+  variables:
+    source_entity: sensor.heat_pump_error_code
+    source_name: "Heat Pump"
+    source_description: "Primary heat pump error-code source."
+    ok_values:
+      - ""
+      - "0"
+  availability: "{{ states(source_entity) != 'unavailable' }}"
+  state: >-
+    {% set raw_value = states(source_entity) %}
+    {% if raw_value in ['unknown', 'none'] %}
+      {{ none }}
+    {% else %}
+      {{ raw_value not in ok_values }}
+    {% endif %}
+  attributes:
+    raw_value: "{{ states(source_entity) }}"
+    source_name: >-
+      {{ source_name
+         or device_attr(source_entity, 'name')
+         or state_attr(source_entity, 'friendly_name')
+         or source_entity }}
+    source_description: "{{ source_description }}"
+    source_error_code: "{{ states(source_entity) }}"
+  device_class: problem

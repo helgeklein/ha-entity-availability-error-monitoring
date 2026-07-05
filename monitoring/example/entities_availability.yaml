@@ -1,0 +1,37 @@
+- name: "Heat Pump: Availability"
+  unique_id: heat_pump_availability
+  variables:
+    source_entity: sensor.heat_pump_outdoor_temperature
+    source_name: "Heat Pump"
+    source_description: "Primary heat pump telemetry source. If unavailable, the device or its integration may be offline."
+  availability: &template_entity_available "{{ states(source_entity) != 'unavailable' }}"
+  state: &availability_sensor_state >-
+    {% set raw_value = states(source_entity) %}
+    {% if raw_value in ['unknown', 'none'] %}
+      {{ none }}
+    {% else %}
+      {{ true }}
+    {% endif %}
+  attributes:
+    raw_value: &template_raw_value "{{ states(source_entity) }}"
+    source_name: &template_source_name >-
+      {{ source_name
+         or device_attr(source_entity, 'name')
+         or state_attr(source_entity, 'friendly_name')
+         or source_entity }}
+    source_description: &template_source_description "{{ source_description }}"
+  device_class: &connectivity_device_class connectivity
+
+- name: "Network Switch: Availability"
+  unique_id: network_switch_availability
+  variables:
+    source_entity: sensor.network_switch_uptime
+    source_name: "Network Switch"
+    source_description: "Infrastructure telemetry source used to monitor switch availability."
+  availability: *template_entity_available
+  state: *availability_sensor_state
+  attributes:
+    raw_value: *template_raw_value
+    source_name: *template_source_name
+    source_description: *template_source_description
+  device_class: *connectivity_device_class

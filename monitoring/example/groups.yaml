@@ -1,0 +1,10 @@
+monitoring_entity_availability:
+  name: "Monitoring: Entity Availability"
+  entities:
+    - binary_sensor.network_switch_availability
+    - binary_sensor.heat_pump_availability
+
+monitoring_entity_errors:
+  name: "Monitoring: Entity Errors"
+  entities:
+    - binary_sensor.heat_pump_error
