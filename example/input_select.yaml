@@ -1,3 +1,15 @@
+# Example language selection.
+#
+# Purpose:
+# Choose which language should be used for generated notification titles and
+# messages.
+#
+# The build script reads this value and inserts the matching translated strings
+# into the generated package.
+#
+# Copy this file to ../private/input_select.yaml and choose the language used
+# for generated user-facing notification text.
+
 monitoring_language:
   name: "Monitoring: Language"
   options:

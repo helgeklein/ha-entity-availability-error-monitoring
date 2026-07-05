@@ -1,3 +1,16 @@
+# Example error-state wrapper entities.
+#
+# Purpose:
+# Define template binary sensors that report whether a device or integration is
+# currently in an error state.
+#
+# These wrapper sensors convert raw error-code entities or status values into a
+# simple on/off monitoring signal and provide readable metadata for generated
+# notifications.
+#
+# Copy this file to ../private/entities_errors.yaml and replace the example
+# sensors with template binary sensors for your own devices or integrations.
+
 - name: "Heat Pump: Error"
   unique_id: heat_pump_error
   variables:

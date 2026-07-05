@@ -1,3 +1,17 @@
+# Example availability wrapper entities.
+#
+# Purpose:
+# Define template binary sensors that report whether a device, entity, or
+# integration should be treated as unavailable or offline.
+#
+# These wrapper sensors are the foundation of availability monitoring. They let
+# you translate raw Home Assistant entities into clear monitoring signals with
+# user-friendly metadata such as a display name and description.
+#
+# Copy this file to ../private/entities_availability.yaml and replace the
+# example sensors with template binary sensors for your own devices or
+# integrations.
+
 - name: "Heat Pump: Availability"
   unique_id: heat_pump_availability
   variables:

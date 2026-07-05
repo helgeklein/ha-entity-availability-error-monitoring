@@ -1,3 +1,15 @@
+# Example monitoring groups.
+#
+# Purpose:
+# Select which wrapper sensors should actually be monitored.
+#
+# The entity files define what each availability or error sensor means. This
+# file decides which of those sensors are active inputs for notification
+# generation.
+#
+# Copy this file to ../private/groups.yaml and list the wrapper entities that
+# should trigger availability and error notifications in your installation.
+
 monitoring_entity_availability:
   name: "Monitoring: Entity Availability"
   entities:

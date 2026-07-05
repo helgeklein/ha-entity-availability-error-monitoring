@@ -19,7 +19,7 @@ Home Assistant entity availability and error monitoring & alerting through nativ
 
 ### 1. Put the project into your Home Assistant config folder
 
-This project must live inside your Home Assistant configuration directory.
+Clone the repository into a subdirectory of your Home Assistant configuration directory (e.g., `config/monitoring`).
 
 Example:
 
@@ -42,17 +42,15 @@ homeassistant:
    packages: !include_dir_named packages
 ```
 
-If you already use packages, you can skip this step.
+### 3. Install Python and the required Python package
 
-### 3. Install the required Python package
-
-The build script needs Python 3 and PyYAML.
-
-Run this from your Home Assistant config folder:
+On your PC, install Python 3. Then install the required Python packages by running:
 
 ```text
-pip install -r monitoring/requirements.txt
+py -3 -m pip install -r "\\HA-MACHINE\config\monitoring\requirements.txt"
 ```
+
+Note: I recommend the [Samba Share app](https://github.com/home-assistant/addons/blob/master/samba/DOCS.md) for easy access to your HA file system.
 
 ### 4. Create your local config files
 
@@ -66,7 +64,7 @@ After that, `monitoring/private/` should contain these files:
 - `input_text.yaml`
 - `input_select.yaml`
 
-These are your own local files. This is where you tell the project what to monitor and where notifications should go.
+These are your own local files. This is where you configure what to monitor and where notifications should be sent to.
 
 ### 5. Define the sensors that should be monitored
 

@@ -1,3 +1,15 @@
+# Example notification target configuration.
+#
+# Purpose:
+# Define where generated notifications should be sent.
+#
+# This file stores the Home Assistant notify target or notify group name used by
+# the generated package when forwarding alerts to mobile apps or other external
+# notification backends.
+#
+# Copy this file to ../private/input_text.yaml and set the Home Assistant notify
+# target or notify group that should receive generated alerts.
+
 monitoring_notify_group:
   name: "Monitoring: Notify Group"
   initial: "mobile_notifications"
