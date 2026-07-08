@@ -347,11 +347,130 @@ def render_entity_list(entities: list[str], indent: int) -> str:
     return "\n".join(f"{prefix}- {entity}" for entity in entities)
 
 
+def render_common_trigger_variables(notify_group: str) -> str:
+    lines = [
+        'trigger_entity: "{{ trigger.entity_id }}"',
+        f"notification_target: {yaml_string(notify_group)}",
+        'notification_channel: "{{ this.attributes.friendly_name }}"',
+        'notification_id: "mon_{{ trigger.entity_id.split(\'.\')[-1] }}"',
+    ]
+    return indent_block("\n".join(lines), 10)
+
+
+def render_metadata_field_lines(
+    field_name: str,
+    attribute_name: str,
+    primary_state_expr: str,
+    secondary_state_expr: str,
+    fallback_to_name: bool = False,
+) -> list[str]:
+    return [
+        f"{field_name}: >-",
+        f"  {{%- set primary_state = {primary_state_expr} -%}}",
+        f"  {{%- set secondary_state = {secondary_state_expr} -%}}",
+        *render_metadata_lookup_lines(attribute_name, fallback_to_name),
+    ]
+
+
+def render_metadata_lookup_lines(attribute_name: str, fallback_to_name: bool = False) -> list[str]:
+    lines = [
+        f"  {{{{ primary_state.attributes.get('{attribute_name}')",
+        f"     if primary_state is not none and primary_state.attributes.get('{attribute_name}') is not none",
+        f"     else secondary_state.attributes.get('{attribute_name}')",
+        f"     if secondary_state is not none and secondary_state.attributes.get('{attribute_name}') is not none",
+    ]
+    if fallback_to_name:
+        lines.extend(
+            [
+                "     else primary_state.name if primary_state is not none",
+                "     else secondary_state.name if secondary_state is not none else '' }}",
+            ]
+        )
+    else:
+        lines.append("     else '' }}")
+    return lines
+
+
+def render_branch_metadata_variable_lines(
+    primary_state_expr: str,
+    secondary_state_expr: str,
+    include_error_code: bool = False,
+) -> str:
+    lines = []
+    lines.extend(
+        render_metadata_field_lines(
+            "trigger_name",
+            "source_name",
+            primary_state_expr,
+            secondary_state_expr,
+            fallback_to_name=True,
+        )
+    )
+    lines.extend(
+        render_metadata_field_lines(
+            "trigger_description",
+            "source_description",
+            primary_state_expr,
+            secondary_state_expr,
+        )
+    )
+    if include_error_code:
+        lines.extend(
+            render_metadata_field_lines(
+                "trigger_error_code",
+                "source_error_code",
+                primary_state_expr,
+                secondary_state_expr,
+            )
+        )
+    return "\n".join(lines)
+
+
+def render_branch_metadata_step(
+    primary_state_expr: str,
+    secondary_state_expr: str,
+    include_error_code: bool = False,
+) -> str:
+    return indent_block(
+        "- variables:\n"
+        + indent_block(
+            render_branch_metadata_variable_lines(
+                primary_state_expr,
+                secondary_state_expr,
+                include_error_code,
+            ),
+            4,
+        ),
+        14,
+    )
+
+
+def render_notification_create_step(title: str, mobile_message: str, message: str) -> str:
+    return indent_block(
+        "\n".join(
+            [
+                "- action: script.monitoring_notification_create",
+                "  data:",
+                '    notification_id: "{{ notification_id }}"',
+                '    notify_group: "{{ notification_target }}"',
+                '    channel: "{{ notification_channel }}"',
+                f"    title: {yaml_string(title)}",
+                "    mobile_message: |-",
+                indent_block(mobile_message, 6),
+                "    message: |-",
+                indent_block(message, 6),
+            ]
+        ),
+        14,
+    )
+
+
 def render_availability_automation(entities: list[str], notify_group: str, t: dict[str, str]) -> str:
     if not entities:
         return ""
 
     entity_lines = render_entity_list(entities, 10)
+    common_trigger_variables = render_common_trigger_variables(notify_group)
     availability_mobile_message = render_text(
         t["availability_mobile_message"],
         trigger_name="{{ trigger_name }}",
@@ -365,8 +484,16 @@ def render_availability_automation(entities: list[str], notify_group: str, t: di
         automation_name="{{ this.attributes.friendly_name }}",
         automation_entity="{{ this.entity_id }}",
     )
-    availability_mobile_message_block = indent_block(availability_mobile_message, 20)
-    availability_message_block = indent_block(availability_message, 20)
+    unavailable_sequence = "\n".join(
+        [
+            render_branch_metadata_step("trigger.to_state", "trigger.from_state"),
+            render_notification_create_step(
+                t["availability_title"],
+                availability_mobile_message,
+                availability_message,
+            ),
+        ]
+    )
     return f'''  #
   # Monitor entity availability (must be binary_sensor!)
   #
@@ -393,28 +520,14 @@ def render_availability_automation(entities: list[str], notify_group: str, t: di
 
     action:
       - variables:
-          trigger_name: "{{{{ state_attr(trigger.entity_id, 'source_name') or trigger.to_state.name }}}}"
-          trigger_description: "{{{{ state_attr(trigger.entity_id, 'source_description') or '' }}}}"
-          trigger_entity: "{{{{ trigger.entity_id }}}}"
-          notification_target: {yaml_string(notify_group)}
-          notification_channel: "{{{{ this.attributes.friendly_name }}}}"
-          notification_id: "mon_{{{{ trigger.entity_id.split('.')[-1] }}}}"
+{common_trigger_variables}
 
       - choose:
           - conditions:
               - condition: trigger
                 id: unavailable
             sequence:
-              - action: script.monitoring_notification_create
-                data:
-                  notification_id: "{{{{ notification_id }}}}"
-                  notify_group: "{{{{ notification_target }}}}"
-                  channel: "{{{{ notification_channel }}}}"
-                  title: {yaml_string(t['availability_title'])}
-                  mobile_message: |-
-{availability_mobile_message_block}
-                  message: |-
-{availability_message_block}
+{unavailable_sequence}
 
           - conditions:
               - condition: trigger
@@ -435,6 +548,7 @@ def render_error_automation(entities: list[str], notify_group: str, t: dict[str,
         return ""
 
     entity_lines = render_entity_list(entities, 10)
+    common_trigger_variables = render_common_trigger_variables(notify_group)
     error_detected_mobile_message = render_text(
         t["error_detected_mobile_message"],
         trigger_name="{{ trigger_name }}",
@@ -463,10 +577,34 @@ def render_error_automation(entities: list[str], notify_group: str, t: dict[str,
         automation_name="{{ this.attributes.friendly_name }}",
         automation_entity="{{ this.entity_id }}",
     )
-    error_detected_mobile_message_block = indent_block(error_detected_mobile_message, 20)
-    error_detected_message_block = indent_block(error_detected_message, 20)
-    error_changed_mobile_message_block = indent_block(error_changed_mobile_message, 20)
-    error_changed_message_block = indent_block(error_changed_message, 20)
+    problem_sequence = "\n".join(
+        [
+            render_branch_metadata_step(
+                "trigger.to_state",
+                "trigger.from_state",
+                include_error_code=True,
+            ),
+            render_notification_create_step(
+                t["error_detected_title"],
+                error_detected_mobile_message,
+                error_detected_message,
+            ),
+        ]
+    )
+    problem_changed_sequence = "\n".join(
+        [
+            render_branch_metadata_step(
+                "trigger.to_state",
+                "trigger.from_state",
+                include_error_code=True,
+            ),
+            render_notification_create_step(
+                t["error_changed_title"],
+                error_changed_mobile_message,
+                error_changed_message,
+            ),
+        ]
+    )
     return f'''  #
   # Monitor entity error codes (must be binary_sensor!)
   #
@@ -498,29 +636,14 @@ def render_error_automation(entities: list[str], notify_group: str, t: dict[str,
 
     action:
       - variables:
-          trigger_name: "{{{{ state_attr(trigger.entity_id, 'source_name') or trigger.to_state.name or trigger.from_state.name }}}}"
-          trigger_description: "{{{{ state_attr(trigger.entity_id, 'source_description') or '' }}}}"
-          trigger_entity: "{{{{ trigger.entity_id }}}}"
-          trigger_error_code: "{{{{ state_attr(trigger.entity_id, 'source_error_code') or '' }}}}"
-          notification_target: {yaml_string(notify_group)}
-          notification_channel: "{{{{ this.attributes.friendly_name }}}}"
-          notification_id: "mon_{{{{ trigger.entity_id.split('.')[-1] }}}}"
+{common_trigger_variables}
 
       - choose:
           - conditions:
               - condition: trigger
                 id: problem
             sequence:
-              - action: script.monitoring_notification_create
-                data:
-                  notification_id: "{{{{ notification_id }}}}"
-                  notify_group: "{{{{ notification_target }}}}"
-                  channel: "{{{{ notification_channel }}}}"
-                  title: {yaml_string(t['error_detected_title'])}
-                  mobile_message: |-
-{error_detected_mobile_message_block}
-                  message: |-
-{error_detected_message_block}
+{problem_sequence}
 
           - conditions:
               - condition: trigger
@@ -533,16 +656,7 @@ def render_error_automation(entities: list[str], notify_group: str, t: dict[str,
                      and trigger.to_state.state == 'on'
                      and trigger.from_state.attributes.get('source_error_code') != trigger.to_state.attributes.get('source_error_code') }}}}
             sequence:
-              - action: script.monitoring_notification_create
-                data:
-                  notification_id: "{{{{ notification_id }}}}"
-                  notify_group: "{{{{ notification_target }}}}"
-                  channel: "{{{{ notification_channel }}}}"
-                  title: {yaml_string(t['error_changed_title'])}
-                  mobile_message: |-
-{error_changed_mobile_message_block}
-                  message: |-
-{error_changed_message_block}
+{problem_changed_sequence}
 
           - conditions:
               - condition: trigger

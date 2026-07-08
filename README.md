@@ -156,7 +156,7 @@ You can change those helper values in Home Assistant Developer Tools to check wh
 1. Open Home Assistant.
 2. Go to **Developer Tools** > **States**.
 3. Find `input_text.monitoring_test_availability`.
-4. Set its state to `unavailable`.
+4. Set its state to `unavailable` or `unknown`.
 5. Wait 5 minutes.
 
 Expected result:
@@ -208,6 +208,7 @@ If these tests do not trigger anything, check that the two test entities are lis
 You do not monitor raw entities directly. Instead, you create template binary sensors that define what counts as:
 
 - unavailable
+- unknown
 - error
 - recovered
 
@@ -241,7 +242,7 @@ Your local configuration must provide the following inputs.
 Each monitored availability wrapper entity must:
 
 - be a binary sensor
-- become `unavailable` when the monitored source is offline
+- become `unavailable` when the monitored source is offline or unknown
 - return to a valid state when the source recovers
 - expose `source_name`
 - expose `source_description`

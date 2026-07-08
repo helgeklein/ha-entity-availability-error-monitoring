@@ -27,14 +27,8 @@
     source_entity: sensor.heat_pump_outdoor_temperature
     source_name: "Heat Pump"
     source_description: "Primary heat pump telemetry source. If unavailable, the device or its integration may be offline."
-  availability: &template_entity_available "{{ states(source_entity) != 'unavailable' }}"
-  state: &availability_sensor_state >-
-    {% set raw_value = states(source_entity) %}
-    {% if raw_value in ['unknown', 'none'] %}
-      {{ none }}
-    {% else %}
-      {{ true }}
-    {% endif %}
+  availability: &template_entity_available "{{ has_value(source_entity) }}"
+  state: &availability_sensor_state "{{ true }}"
   attributes:
     raw_value: &template_raw_value "{{ states(source_entity) }}"
     source_name: &template_source_name >-
@@ -64,8 +58,8 @@
   variables:
     source_entity: input_text.monitoring_test_availability
     source_name: "Test Entity"
-    source_description: "Self-contained availability test entity. In Home Assistant Developer Tools > States, set input_text.monitoring_test_availability to 'unavailable' to trigger an alert. Set it to 'on' or 'off' to test recovery."
-  availability: "{{ states(source_entity) != 'unavailable' }}"
+    source_description: "Self-contained availability test entity. In Home Assistant Developer Tools > States, set input_text.monitoring_test_availability to 'unavailable' or 'unknown' to trigger an alert. Set it to 'on' or 'off' to test recovery."
+  availability: "{{ has_value(source_entity) }}"
   state: "{{ true }}"
   attributes:
     raw_value: "{{ states(source_entity) }}"
