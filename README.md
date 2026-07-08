@@ -17,6 +17,8 @@ Home Assistant entity availability and error monitoring & alerting through nativ
 
 See [this blog post](https://helgeklein.com/blog/home-assistant-entity-availability-and-error-monitoring/) for a high-level architecture overview and for some things I learned while implementing this solution.
 
+<img width="434" height="337" alt="Notification" src="https://github.com/user-attachments/assets/593b459d-dc66-425a-b74d-c15f33e0c60b" />
+
 ## Installation
 
 ### 1. Put the project into your Home Assistant config folder
