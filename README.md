@@ -17,8 +17,6 @@ Home Assistant entity availability and error monitoring & alerting through nativ
 
 See [this blog post](https://helgeklein.com/blog/home-assistant-entity-availability-and-error-monitoring/) for a high-level architecture overview and for some things I learned while implementing this solution.
 
-<img width="434" height="337" alt="Notification" src="https://github.com/user-attachments/assets/593b459d-dc66-425a-b74d-c15f33e0c60b" />
-
 ## Installation
 
 ### 1. Put the project into your Home Assistant config folder
@@ -164,8 +162,8 @@ You can change those helper values in Home Assistant Developer Tools to check wh
 Expected result:
 
 - `binary_sensor.test_entity_availability` becomes unavailable.
-- A persistent notification is created in Home Assistant.
-- A notify-based alert is sent to your configured notification target.
+- An "error" persistent notification is created in Home Assistant.
+- An "error" notify-based alert is sent to your configured notification target.
 
 To test recovery:
 
@@ -174,8 +172,8 @@ To test recovery:
 
 Expected result:
 
-- the availability notification is dismissed
-- the matching mobile notification is cleared
+- A "recovery" persistent notification is created in Home Assistant.
+- A "recovery" notify-based alert is sent to your configured notification target.
 
 ### Test error monitoring
 
@@ -186,9 +184,9 @@ Expected result:
 
 Expected result:
 
-- `binary_sensor.test_entity_error` turns on
-- a persistent notification is created in Home Assistant
-- a notify-based alert is sent to your configured notification target
+- `binary_sensor.test_entity_error` turns on.
+- An "error" persistent notification is created in Home Assistant.
+- An "error" notify-based alert is sent to your configured notification target.
 
 To test recovery:
 
@@ -197,9 +195,9 @@ To test recovery:
 
 Expected result:
 
-- `binary_sensor.test_entity_error` turns off
-- the error notification is dismissed
-- the matching mobile notification is cleared
+- `binary_sensor.test_entity_error` turns off.
+- A "recovery" persistent notification is created in Home Assistant.
+- A "recovery" notify-based alert is sent to your configured notification target.
 
 If these tests do not trigger anything, check that the two test entities are listed in `groups.yaml`, then rebuild the package and reload or restart Home Assistant.
 

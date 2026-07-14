@@ -21,16 +21,30 @@ except ImportError as exc:  # pragma: no cover - import guard for target machine
 PROJECT_DIR = Path(__file__).resolve().parent
 PROJECT_DIR_NAME = PROJECT_DIR.name
 DEFAULT_PRIVATE_DIR = Path(PROJECT_DIR_NAME) / "private"
+ACTIVE_AVAILABILITY_HELPER_PREFIX = "input_boolean.monitoring_availability_active_"
+ACTIVE_ERROR_HELPER_PREFIX = "input_boolean.monitoring_error_active_"
+MONITORING_AUTOMATION_MAX_QUEUED_RUNS = 100
 
 
 TRANSLATIONS = {
     "en": {
         "availability_title": "⚠️ Entity is offline",
+        "availability_recovered_title": "✅ Entity is online again",
         "error_detected_title": "⚠️ Error detected",
         "error_changed_title": "⚠️ Error changed",
+        "error_recovered_title": "✅ Error cleared",
         "availability_mobile_message": "The entity {trigger_name} is offline.\n{trigger_description}",
+        "availability_recovered_mobile_message": (
+            "The entity {trigger_name} is online again.\n{trigger_description}"
+        ),
         "availability_message": (
             "The entity **{trigger_name}** is offline.\n\n"
+            "Entity description: {trigger_description}\n\n"
+            "Monitored entity: `{trigger_entity}`\n\n"
+            "Created by automation: **{automation_name}** (`{automation_entity}`)"
+        ),
+        "availability_recovered_message": (
+            "The entity **{trigger_name}** is online again.\n\n"
             "Entity description: {trigger_description}\n\n"
             "Monitored entity: `{trigger_entity}`\n\n"
             "Created by automation: **{automation_name}** (`{automation_entity}`)"
@@ -51,14 +65,32 @@ TRANSLATIONS = {
             "Monitored entity: `{trigger_entity}`\n\n"
             "Created by automation: **{automation_name}** (`{automation_entity}`)"
         ),
+        "error_recovered_mobile_message": "The entity {trigger_name} no longer reports an error.",
+        "error_recovered_message": (
+            "The entity **{trigger_name}** no longer reports an error.\n\n"
+            "Entity description: {trigger_description}\n\n"
+            "Monitored entity: `{trigger_entity}`\n\n"
+            "Created by automation: **{automation_name}** (`{automation_entity}`)"
+        ),
     },
     "de": {
         "availability_title": "⚠️ Entität ist offline",
+        "availability_recovered_title": "✅ Entität ist wieder online",
         "error_detected_title": "⚠️ Fehler erkannt",
         "error_changed_title": "⚠️ Fehler geändert",
+        "error_recovered_title": "✅ Fehler behoben",
         "availability_mobile_message": "Die Entität {trigger_name} ist offline.\n{trigger_description}",
+        "availability_recovered_mobile_message": (
+            "Die Entität {trigger_name} ist wieder online.\n{trigger_description}"
+        ),
         "availability_message": (
             "Die Entität **{trigger_name}** ist offline.\n\n"
+            "Beschreibung der Entität: {trigger_description}\n\n"
+            "Überwachte Entität: `{trigger_entity}`\n\n"
+            "Erstellt von Automatisierung: **{automation_name}** (`{automation_entity}`)"
+        ),
+        "availability_recovered_message": (
+            "Die Entität **{trigger_name}** ist wieder online.\n\n"
             "Beschreibung der Entität: {trigger_description}\n\n"
             "Überwachte Entität: `{trigger_entity}`\n\n"
             "Erstellt von Automatisierung: **{automation_name}** (`{automation_entity}`)"
@@ -79,10 +111,17 @@ TRANSLATIONS = {
             "Überwachte Entität: `{trigger_entity}`\n\n"
             "Erstellt von Automatisierung: **{automation_name}** (`{automation_entity}`)"
         ),
+        "error_recovered_mobile_message": "Die Entität {trigger_name} meldet keinen Fehler mehr.",
+        "error_recovered_message": (
+            "Die Entität **{trigger_name}** meldet keinen Fehler mehr.\n\n"
+            "Beschreibung der Entität: {trigger_description}\n\n"
+            "Überwachte Entität: `{trigger_entity}`\n\n"
+            "Erstellt von Automatisierung: **{automation_name}** (`{automation_entity}`)"
+        ),
     },
 }
 
-MONITORING_TEMPLATE = Template(
+HEADER_TEMPLATE = Template(
     """#
 # Monitoring and notifications
 #
@@ -90,91 +129,20 @@ MONITORING_TEMPLATE = Template(
 #
 # Source inputs:
 $source_inputs
-#
+#"""
+)
 
-######################################################################
+AUTOMATIONS_HEADER = """######################################################################
 #
 # Monitoring automations
 #
-######################################################################
+######################################################################"""
 
-automation:
-$availability_automation$error_automation
-######################################################################
+SCRIPTS_HEADER = """######################################################################
 #
 # Notification scripts
 #
-######################################################################
-
-script:
-  monitoring_notification_create:
-    alias: "Monitoring: Create Notification"
-    description: "Creates a persistent notification and forwards it to a mobile notify group."
-    mode: queued
-    fields:
-      notification_id:
-        description: "Unique notification ID used for both HA and mobile notifications."
-      notify_group:
-        description: "Notify group name."
-      channel:
-        description: "Optional mobile notification channel name for platforms that support it."
-      title:
-        description: "Notification title."
-      mobile_message:
-        description: "Short plain-text variant for mobile notifications."
-      message:
-        description: "Notification message."
-    sequence:
-      - service: persistent_notification.create
-        data:
-          notification_id: "{{ notification_id }}"
-          title: "{{ title }}"
-          message: "{{ message }}"
-      - action: "notify.{{ notify_group }}"
-        data:
-          title: "{{ title }}"
-          message: "{{ mobile_message }}"
-          data:
-            tag: "{{ notification_id }}"
-            channel: "{{ channel }}"
-
-  monitoring_notification_dismiss:
-    alias: "Monitoring: Dismiss Notification"
-    description: "Dismisses a persistent notification and clears the matching mobile notification."
-    mode: queued
-    fields:
-      notification_id:
-        description: "Notification ID to dismiss and clear."
-      notify_group:
-        description: "Notify group name."
-    sequence:
-      - service: persistent_notification.dismiss
-        data:
-          notification_id: "{{ notification_id }}"
-      - action: "notify.{{ notify_group }}"
-        data:
-          message: "clear_notification"
-          data:
-            tag: "{{ notification_id }}"
-
-input_text:
-    monitoring_test_availability:
-        name: "Monitoring: Test Availability Source"
-        initial: "on"
-        min: 0
-        max: 100
-
-    monitoring_test_error_code:
-        name: "Monitoring: Test Error Code"
-        initial: "0"
-        min: 0
-        max: 100
-
-template:
-    - binary_sensor: !include $availability_include
-    - binary_sensor: !include $error_include
-"""
-)
+######################################################################"""
 
 
 def parse_args() -> argparse.Namespace:
@@ -215,17 +183,517 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def yaml_string(value: str) -> str:
-    return json.dumps(value, ensure_ascii=False)
-
-
 def render_text(template: str, **placeholders: str) -> str:
     return template.format_map(placeholders)
 
 
-def indent_block(text: str, indent: int) -> str:
-    prefix = " " * indent
-    return "\n".join(f"{prefix}{line}" for line in text.splitlines())
+class MonitoringYamlDumper(yaml.SafeDumper):
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, False)
+
+
+class IncludePath(str):
+    pass
+
+
+def _ignore_yaml_aliases(self, data) -> bool:
+    return True
+
+
+MonitoringYamlDumper.ignore_aliases = _ignore_yaml_aliases
+
+
+def _represent_string(dumper: MonitoringYamlDumper, value: str):
+    style = "|" if "\n" in value else None
+    return dumper.represent_scalar("tag:yaml.org,2002:str", value, style=style)
+
+
+def _represent_include_path(dumper: MonitoringYamlDumper, value: IncludePath):
+    return dumper.represent_scalar("!include", str(value))
+
+
+MonitoringYamlDumper.add_representer(str, _represent_string)
+MonitoringYamlDumper.add_representer(IncludePath, _represent_include_path)
+
+
+def dump_yaml(data: object) -> str:
+    return yaml.dump(
+        data,
+        Dumper=MonitoringYamlDumper,
+        allow_unicode=True,
+        sort_keys=False,
+        default_flow_style=False,
+        indent=2,
+        width=4096,
+    ).rstrip()
+
+
+def render_script_section_data() -> dict:
+    return {
+        "monitoring_notification_create": {
+            "alias": "Monitoring: Create Notification",
+            "description": "Creates a persistent notification and forwards it to a mobile notify group.",
+            "mode": "queued",
+            "fields": {
+                "notification_id": {
+                    "description": "Unique notification ID used for both HA and mobile notifications."
+                },
+                "notify_group": {"description": "Notify group name."},
+                "channel": {
+                    "description": "Optional mobile notification channel name for platforms that support it."
+                },
+                "title": {"description": "Notification title."},
+                "mobile_message": {
+                    "description": "Short plain-text variant for mobile notifications."
+                },
+                "message": {"description": "Notification message."},
+            },
+            "sequence": [
+                {
+                    "service": "persistent_notification.create",
+                    "data": {
+                        "notification_id": "{{ notification_id }}",
+                        "title": "{{ title }}",
+                        "message": "{{ message }}",
+                    },
+                },
+                {
+                    "action": "notify.{{ notify_group }}",
+                    "data": {
+                        "title": "{{ title }}",
+                        "message": "{{ mobile_message }}",
+                        "data": {
+                            "tag": "{{ notification_id }}",
+                            "channel": "{{ channel }}",
+                        },
+                    },
+                },
+            ],
+        },
+        "monitoring_notification_dismiss": {
+            "alias": "Monitoring: Dismiss Notification",
+            "description": "Dismisses a persistent notification and clears the matching mobile notification.",
+            "mode": "queued",
+            "fields": {
+                "notification_id": {"description": "Notification ID to dismiss and clear."},
+                "notify_group": {"description": "Notify group name."},
+            },
+            "sequence": [
+                {
+                    "service": "persistent_notification.dismiss",
+                    "data": {"notification_id": "{{ notification_id }}"},
+                },
+                {
+                    "action": "notify.{{ notify_group }}",
+                    "data": {
+                        "message": "clear_notification",
+                        "data": {"tag": "{{ notification_id }}"},
+                    },
+                },
+            ],
+        },
+    }
+
+
+def render_input_boolean_section_data(availability_entities: list[str], error_entities: list[str]) -> dict:
+    helper_entries: list[tuple[str, str]] = []
+    helper_entries.extend(("availability_active", entity_id) for entity_id in availability_entities)
+    helper_entries.extend(("error_active", entity_id) for entity_id in error_entities)
+
+    deduped_entries = list(dict.fromkeys(helper_entries))
+    section: dict[str, dict[str, str]] = {}
+    for prefix, entity_id in deduped_entries:
+        object_id = helper_object_id(prefix, entity_id)
+        section[object_id] = {"name": f"Monitoring: {object_id}"}
+    return section
+
+
+def render_common_trigger_variables_data(
+    notify_group: str,
+    active_notification_helper_prefix: str,
+    source_entities: dict[str, str],
+) -> dict[str, str]:
+    source_entity_map = json.dumps(source_entities, ensure_ascii=False)
+    return {
+        "trigger_entity": "{{ trigger.entity_id }}",
+        "notification_target": notify_group,
+        "notification_channel": "{{ this.attributes.friendly_name }}",
+        "notification_id": "mon_{{ trigger.entity_id.split('.')[-1] }}",
+        "recovery_notification_id": "mon_{{ trigger.entity_id.split('.')[-1] }}_recovery",
+        "active_notification_helper": (
+            f"{active_notification_helper_prefix}{{{{ trigger.entity_id.split('.')[-1] }}}}"
+        ),
+        "source_entity": f"{{{{ {source_entity_map}.get(trigger.entity_id, '') }}}}",
+    }
+
+
+def render_metadata_template(
+    attribute_name: str,
+    primary_state_expr: str,
+    secondary_state_expr: str,
+    *,
+    fallback_to_name: bool = False,
+) -> str:
+    lines = [
+        f"{{%- set primary_state = {primary_state_expr} -%}}",
+        f"{{%- set secondary_state = {secondary_state_expr} -%}}",
+        f"{{{{ primary_state.attributes.get('{attribute_name}')",
+        f"   if primary_state is not none and primary_state.attributes.get('{attribute_name}') is not none",
+        f"   else secondary_state.attributes.get('{attribute_name}')",
+        f"   if secondary_state is not none and secondary_state.attributes.get('{attribute_name}') is not none",
+    ]
+    if fallback_to_name:
+        lines.extend(
+            [
+                "   else primary_state.name if primary_state is not none",
+                "   else secondary_state.name if secondary_state is not none else '' }}",
+            ]
+        )
+    else:
+        lines.append("   else '' }}")
+    return "\n".join(lines)
+
+
+def render_branch_metadata_step_data(
+    primary_state_expr: str,
+    secondary_state_expr: str,
+    *,
+    include_error_code: bool = False,
+) -> dict:
+    variables = {
+        "trigger_name": render_metadata_template(
+            "source_name",
+            primary_state_expr,
+            secondary_state_expr,
+            fallback_to_name=True,
+        ),
+        "trigger_description": render_metadata_template(
+            "source_description",
+            primary_state_expr,
+            secondary_state_expr,
+        ),
+    }
+    if include_error_code:
+        variables["trigger_error_code"] = render_metadata_template(
+            "source_error_code",
+            primary_state_expr,
+            secondary_state_expr,
+        )
+    return {"variables": variables}
+
+
+def render_notification_create_step_data(
+    title: str,
+    mobile_message: str,
+    message: str,
+    *,
+    notification_id_variable: str = "notification_id",
+) -> dict:
+    return {
+        "action": "script.monitoring_notification_create",
+        "data": {
+            "notification_id": f"{{{{ {notification_id_variable} }}}}",
+            "notify_group": "{{ notification_target }}",
+            "channel": "{{ notification_channel }}",
+            "title": title,
+            "mobile_message": mobile_message,
+            "message": message,
+        },
+    }
+
+
+def render_set_active_notification_helper_step_data(*, turn_on: bool) -> dict:
+    service_name = "input_boolean.turn_on" if turn_on else "input_boolean.turn_off"
+    return {
+        "action": service_name,
+        "target": {"entity_id": "{{ active_notification_helper }}"},
+    }
+
+
+def render_recovery_active_condition_step_data() -> dict:
+    return {
+        "condition": "template",
+        "value_template": "{{ is_state(active_notification_helper, 'on') }}",
+    }
+
+
+def render_recovery_source_changed_condition_step_data() -> dict:
+    return {
+        "condition": "template",
+        "value_template": "{% set active = expand(active_notification_helper) | first %}\n{% set source = expand(source_entity) | first %}\n{{ source is not none and active is not none and source.last_changed > active.last_changed }}",
+    }
+
+
+def render_availability_automation_data(
+    entities: list[str],
+    notify_group: str,
+    t: dict[str, str],
+    source_entities: dict[str, str],
+) -> dict | None:
+    if not entities:
+        return None
+
+    common_trigger_variables = render_common_trigger_variables_data(
+        notify_group,
+        ACTIVE_AVAILABILITY_HELPER_PREFIX,
+        source_entities,
+    )
+    availability_mobile_message = render_text(
+        t["availability_mobile_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_description="{{ trigger_description }}",
+    )
+    availability_message = render_text(
+        t["availability_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_description="{{ trigger_description }}",
+        trigger_entity="{{ trigger_entity }}",
+        automation_name="{{ this.attributes.friendly_name }}",
+        automation_entity="{{ this.entity_id }}",
+    )
+    availability_recovered_mobile_message = render_text(
+        t["availability_recovered_mobile_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_description="{{ trigger_description }}",
+    )
+    availability_recovered_message = render_text(
+        t["availability_recovered_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_description="{{ trigger_description }}",
+        trigger_entity="{{ trigger_entity }}",
+        automation_name="{{ this.attributes.friendly_name }}",
+        automation_entity="{{ this.entity_id }}",
+    )
+    return {
+        "id": "monitoring_entity_availability",
+        "alias": "Monitoring: Entity availability",
+        "description": "Monitors configured availability entities and sends a notification if any of them become unavailable.",
+        "mode": "queued",
+        "max": MONITORING_AUTOMATION_MAX_QUEUED_RUNS,
+        "trigger": [
+            {
+                "platform": "state",
+                "id": "unavailable",
+                "entity_id": entities,
+                "to": "unavailable",
+                "for": {"minutes": 5},
+            },
+            {
+                "platform": "state",
+                "id": "recovery",
+                "entity_id": entities,
+                "from": "unavailable",
+            },
+        ],
+        "action": [
+            {"variables": common_trigger_variables},
+            {
+                "choose": [
+                    {
+                        "conditions": [{"condition": "trigger", "id": "unavailable"}],
+                        "sequence": [
+                            render_branch_metadata_step_data("trigger.to_state", "trigger.from_state"),
+                            render_notification_create_step_data(
+                                t["availability_title"],
+                                availability_mobile_message,
+                                availability_message,
+                            ),
+                            render_set_active_notification_helper_step_data(turn_on=True),
+                        ],
+                    },
+                    {
+                        "conditions": [
+                            {"condition": "trigger", "id": "recovery"},
+                            {
+                                "condition": "template",
+                                "value_template": "{{ trigger.to_state is not none and trigger.to_state.state in ['on', 'off'] }}",
+                            },
+                        ],
+                        "sequence": [
+                            render_recovery_active_condition_step_data(),
+                            render_recovery_source_changed_condition_step_data(),
+                            render_branch_metadata_step_data("trigger.to_state", "trigger.from_state"),
+                            render_notification_create_step_data(
+                                t["availability_recovered_title"],
+                                availability_recovered_mobile_message,
+                                availability_recovered_message,
+                                notification_id_variable="recovery_notification_id",
+                            ),
+                            render_set_active_notification_helper_step_data(turn_on=False),
+                        ],
+                    },
+                ]
+            },
+        ],
+    }
+
+
+def render_error_automation_data(
+    entities: list[str],
+    notify_group: str,
+    t: dict[str, str],
+    source_entities: dict[str, str],
+) -> dict | None:
+    if not entities:
+        return None
+
+    common_trigger_variables = render_common_trigger_variables_data(
+        notify_group,
+        ACTIVE_ERROR_HELPER_PREFIX,
+        source_entities,
+    )
+    error_detected_mobile_message = render_text(
+        t["error_detected_mobile_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_error_code="{{ trigger_error_code }}",
+    )
+    error_detected_message = render_text(
+        t["error_detected_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_error_code="{{ trigger_error_code }}",
+        trigger_description="{{ trigger_description }}",
+        trigger_entity="{{ trigger_entity }}",
+        automation_name="{{ this.attributes.friendly_name }}",
+        automation_entity="{{ this.entity_id }}",
+    )
+    error_changed_mobile_message = render_text(
+        t["error_changed_mobile_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_error_code="{{ trigger_error_code }}",
+    )
+    error_changed_message = render_text(
+        t["error_changed_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_error_code="{{ trigger_error_code }}",
+        trigger_description="{{ trigger_description }}",
+        trigger_entity="{{ trigger_entity }}",
+        automation_name="{{ this.attributes.friendly_name }}",
+        automation_entity="{{ this.entity_id }}",
+    )
+    error_recovered_mobile_message = render_text(
+        t["error_recovered_mobile_message"],
+        trigger_name="{{ trigger_name }}",
+    )
+    error_recovered_message = render_text(
+        t["error_recovered_message"],
+        trigger_name="{{ trigger_name }}",
+        trigger_description="{{ trigger_description }}",
+        trigger_entity="{{ trigger_entity }}",
+        automation_name="{{ this.attributes.friendly_name }}",
+        automation_entity="{{ this.entity_id }}",
+    )
+    return {
+        "id": "monitoring_entity_errors",
+        "alias": "Monitoring: Entity error codes",
+        "description": "Monitors configured error wrapper entities and sends a notification if any of them report a problem.",
+        "mode": "queued",
+        "max": MONITORING_AUTOMATION_MAX_QUEUED_RUNS,
+        "trigger": [
+            {
+                "platform": "state",
+                "id": "problem",
+                "entity_id": entities,
+                "to": "on",
+            },
+            {
+                "platform": "state",
+                "id": "problem_changed",
+                "entity_id": entities,
+                "attribute": "source_error_code",
+            },
+            {
+                "platform": "state",
+                "id": "recovery",
+                "entity_id": entities,
+                "from": "on",
+                "to": "off",
+            },
+        ],
+        "action": [
+            {"variables": common_trigger_variables},
+            {
+                "choose": [
+                    {
+                        "conditions": [{"condition": "trigger", "id": "problem"}],
+                        "sequence": [
+                            render_branch_metadata_step_data(
+                                "trigger.to_state",
+                                "trigger.from_state",
+                                include_error_code=True,
+                            ),
+                            render_notification_create_step_data(
+                                t["error_detected_title"],
+                                error_detected_mobile_message,
+                                error_detected_message,
+                            ),
+                            render_set_active_notification_helper_step_data(turn_on=True),
+                        ],
+                    },
+                    {
+                        "conditions": [
+                            {"condition": "trigger", "id": "problem_changed"},
+                            {
+                                "condition": "template",
+                                "value_template": "{{ trigger.from_state is not none and trigger.to_state is not none and trigger.from_state.state == 'on' and trigger.to_state.state == 'on' and trigger.from_state.attributes.get('source_error_code') != trigger.to_state.attributes.get('source_error_code') }}",
+                            },
+                        ],
+                        "sequence": [
+                            render_branch_metadata_step_data(
+                                "trigger.to_state",
+                                "trigger.from_state",
+                                include_error_code=True,
+                            ),
+                            render_notification_create_step_data(
+                                t["error_changed_title"],
+                                error_changed_mobile_message,
+                                error_changed_message,
+                            ),
+                            render_set_active_notification_helper_step_data(turn_on=True),
+                        ],
+                    },
+                    {
+                        "conditions": [{"condition": "trigger", "id": "recovery"}],
+                        "sequence": [
+                            render_recovery_active_condition_step_data(),
+                            render_recovery_source_changed_condition_step_data(),
+                            render_branch_metadata_step_data("trigger.to_state", "trigger.from_state"),
+                            render_notification_create_step_data(
+                                t["error_recovered_title"],
+                                error_recovered_mobile_message,
+                                error_recovered_message,
+                                notification_id_variable="recovery_notification_id",
+                            ),
+                            render_set_active_notification_helper_step_data(turn_on=False),
+                        ],
+                    },
+                ]
+            },
+        ],
+    }
+
+
+def render_input_text_section_data() -> dict:
+    return {
+        "monitoring_test_availability": {
+            "name": "Monitoring: Test Availability Source",
+            "initial": "on",
+            "min": 0,
+            "max": 100,
+        },
+        "monitoring_test_error_code": {
+            "name": "Monitoring: Test Error Code",
+            "initial": "0",
+            "min": 0,
+            "max": 100,
+        },
+    }
+
+
+def render_template_section_data(availability_include: str, error_include: str) -> list[dict[str, IncludePath]]:
+    return [
+        {"binary_sensor": IncludePath(availability_include)},
+        {"binary_sensor": IncludePath(error_include)},
+    ]
 
 
 def resolve_under_root(root: Path, path: Path) -> Path:
@@ -342,332 +810,38 @@ def resolve_language(input_select_data: dict, path: Path) -> str:
     return selected
 
 
-def render_entity_list(entities: list[str], indent: int) -> str:
-    prefix = " " * indent
-    return "\n".join(f"{prefix}- {entity}" for entity in entities)
+def read_template_binary_sensor_source_entities(path: Path) -> dict[str, str]:
+    loaded = read_yaml_document(path)
 
+    if not isinstance(loaded, list):
+        raise SystemExit(f"Expected a YAML list in {path}, got {type(loaded).__name__}")
 
-def render_common_trigger_variables(notify_group: str) -> str:
-    lines = [
-        'trigger_entity: "{{ trigger.entity_id }}"',
-        f"notification_target: {yaml_string(notify_group)}",
-        'notification_channel: "{{ this.attributes.friendly_name }}"',
-        'notification_id: "mon_{{ trigger.entity_id.split(\'.\')[-1] }}"',
-    ]
-    return indent_block("\n".join(lines), 10)
+    source_entities: dict[str, str] = {}
+    for index, item in enumerate(loaded, start=1):
+        if not isinstance(item, dict):
+            raise SystemExit(f"Expected list item {index} in {path} to be a mapping")
 
+        unique_id = item.get("unique_id")
+        if not isinstance(unique_id, str) or not unique_id:
+            raise SystemExit(f"Expected 'unique_id' in list item {index} of {path} to be a non-empty string")
 
-def render_metadata_field_lines(
-    field_name: str,
-    attribute_name: str,
-    primary_state_expr: str,
-    secondary_state_expr: str,
-    fallback_to_name: bool = False,
-) -> list[str]:
-    return [
-        f"{field_name}: >-",
-        f"  {{%- set primary_state = {primary_state_expr} -%}}",
-        f"  {{%- set secondary_state = {secondary_state_expr} -%}}",
-        *render_metadata_lookup_lines(attribute_name, fallback_to_name),
-    ]
+        variables = item.get("variables")
+        if not isinstance(variables, dict):
+            raise SystemExit(f"Expected 'variables' in list item {index} of {path} to be a mapping")
 
-
-def render_metadata_lookup_lines(attribute_name: str, fallback_to_name: bool = False) -> list[str]:
-    lines = [
-        f"  {{{{ primary_state.attributes.get('{attribute_name}')",
-        f"     if primary_state is not none and primary_state.attributes.get('{attribute_name}') is not none",
-        f"     else secondary_state.attributes.get('{attribute_name}')",
-        f"     if secondary_state is not none and secondary_state.attributes.get('{attribute_name}') is not none",
-    ]
-    if fallback_to_name:
-        lines.extend(
-            [
-                "     else primary_state.name if primary_state is not none",
-                "     else secondary_state.name if secondary_state is not none else '' }}",
-            ]
-        )
-    else:
-        lines.append("     else '' }}")
-    return lines
-
-
-def render_branch_metadata_variable_lines(
-    primary_state_expr: str,
-    secondary_state_expr: str,
-    include_error_code: bool = False,
-) -> str:
-    lines = []
-    lines.extend(
-        render_metadata_field_lines(
-            "trigger_name",
-            "source_name",
-            primary_state_expr,
-            secondary_state_expr,
-            fallback_to_name=True,
-        )
-    )
-    lines.extend(
-        render_metadata_field_lines(
-            "trigger_description",
-            "source_description",
-            primary_state_expr,
-            secondary_state_expr,
-        )
-    )
-    if include_error_code:
-        lines.extend(
-            render_metadata_field_lines(
-                "trigger_error_code",
-                "source_error_code",
-                primary_state_expr,
-                secondary_state_expr,
+        source_entity = variables.get("source_entity")
+        if not isinstance(source_entity, str) or not source_entity:
+            raise SystemExit(
+                f"Expected 'variables.source_entity' in list item {index} of {path} to be a non-empty string"
             )
-        )
-    return "\n".join(lines)
+
+        source_entities[f"binary_sensor.{unique_id}"] = source_entity
+
+    return source_entities
 
 
-def render_branch_metadata_step(
-    primary_state_expr: str,
-    secondary_state_expr: str,
-    include_error_code: bool = False,
-) -> str:
-    return indent_block(
-        "- variables:\n"
-        + indent_block(
-            render_branch_metadata_variable_lines(
-                primary_state_expr,
-                secondary_state_expr,
-                include_error_code,
-            ),
-            4,
-        ),
-        14,
-    )
-
-
-def render_notification_create_step(title: str, mobile_message: str, message: str) -> str:
-    return indent_block(
-        "\n".join(
-            [
-                "- action: script.monitoring_notification_create",
-                "  data:",
-                '    notification_id: "{{ notification_id }}"',
-                '    notify_group: "{{ notification_target }}"',
-                '    channel: "{{ notification_channel }}"',
-                f"    title: {yaml_string(title)}",
-                "    mobile_message: |-",
-                indent_block(mobile_message, 6),
-                "    message: |-",
-                indent_block(message, 6),
-            ]
-        ),
-        14,
-    )
-
-
-def render_availability_automation(entities: list[str], notify_group: str, t: dict[str, str]) -> str:
-    if not entities:
-        return ""
-
-    entity_lines = render_entity_list(entities, 10)
-    common_trigger_variables = render_common_trigger_variables(notify_group)
-    availability_mobile_message = render_text(
-        t["availability_mobile_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_description="{{ trigger_description }}",
-    )
-    availability_message = render_text(
-        t["availability_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_description="{{ trigger_description }}",
-        trigger_entity="{{ trigger_entity }}",
-        automation_name="{{ this.attributes.friendly_name }}",
-        automation_entity="{{ this.entity_id }}",
-    )
-    unavailable_sequence = "\n".join(
-        [
-            render_branch_metadata_step("trigger.to_state", "trigger.from_state"),
-            render_notification_create_step(
-                t["availability_title"],
-                availability_mobile_message,
-                availability_message,
-            ),
-        ]
-    )
-    return f'''  #
-  # Monitor entity availability (must be binary_sensor!)
-  #
-  - id: "monitoring_entity_availability"
-    alias: "Monitoring: Entity availability"
-    description: "Monitors configured availability entities and sends a notification if any of them become unavailable."
-    mode: parallel
-    max: 10
-
-    trigger:
-      - platform: state
-        id: unavailable
-        entity_id:
-{entity_lines}
-        to: "unavailable"
-        for:
-          minutes: 5
-
-      - platform: state
-        id: recovery
-        entity_id:
-{entity_lines}
-        from: "unavailable"
-
-    action:
-      - variables:
-{common_trigger_variables}
-
-      - choose:
-          - conditions:
-              - condition: trigger
-                id: unavailable
-            sequence:
-{unavailable_sequence}
-
-          - conditions:
-              - condition: trigger
-                id: recovery
-              - condition: template
-                value_template: "{{{{ trigger.to_state is not none and trigger.to_state.state in ['on', 'off'] }}}}"
-            sequence:
-              - action: script.monitoring_notification_dismiss
-                data:
-                  notification_id: "{{{{ notification_id }}}}"
-                  notify_group: "{{{{ notification_target }}}}"
-
-'''
-
-
-def render_error_automation(entities: list[str], notify_group: str, t: dict[str, str]) -> str:
-    if not entities:
-        return ""
-
-    entity_lines = render_entity_list(entities, 10)
-    common_trigger_variables = render_common_trigger_variables(notify_group)
-    error_detected_mobile_message = render_text(
-        t["error_detected_mobile_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_error_code="{{ trigger_error_code }}",
-    )
-    error_detected_message = render_text(
-        t["error_detected_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_error_code="{{ trigger_error_code }}",
-        trigger_description="{{ trigger_description }}",
-        trigger_entity="{{ trigger_entity }}",
-        automation_name="{{ this.attributes.friendly_name }}",
-        automation_entity="{{ this.entity_id }}",
-    )
-    error_changed_mobile_message = render_text(
-        t["error_changed_mobile_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_error_code="{{ trigger_error_code }}",
-    )
-    error_changed_message = render_text(
-        t["error_changed_message"],
-        trigger_name="{{ trigger_name }}",
-        trigger_error_code="{{ trigger_error_code }}",
-        trigger_description="{{ trigger_description }}",
-        trigger_entity="{{ trigger_entity }}",
-        automation_name="{{ this.attributes.friendly_name }}",
-        automation_entity="{{ this.entity_id }}",
-    )
-    problem_sequence = "\n".join(
-        [
-            render_branch_metadata_step(
-                "trigger.to_state",
-                "trigger.from_state",
-                include_error_code=True,
-            ),
-            render_notification_create_step(
-                t["error_detected_title"],
-                error_detected_mobile_message,
-                error_detected_message,
-            ),
-        ]
-    )
-    problem_changed_sequence = "\n".join(
-        [
-            render_branch_metadata_step(
-                "trigger.to_state",
-                "trigger.from_state",
-                include_error_code=True,
-            ),
-            render_notification_create_step(
-                t["error_changed_title"],
-                error_changed_mobile_message,
-                error_changed_message,
-            ),
-        ]
-    )
-    return f'''  #
-  # Monitor entity error codes (must be binary_sensor!)
-  #
-  - id: "monitoring_entity_errors"
-    alias: "Monitoring: Entity error codes"
-    description: "Monitors configured error wrapper entities and sends a notification if any of them report a problem."
-    mode: parallel
-    max: 10
-
-    trigger:
-      - platform: state
-        id: problem
-        entity_id:
-{entity_lines}
-        to: "on"
-
-      - platform: state
-        id: problem_changed
-        entity_id:
-{entity_lines}
-        attribute: source_error_code
-
-      - platform: state
-        id: recovery
-        entity_id:
-{entity_lines}
-        from: "on"
-        to: "off"
-
-    action:
-      - variables:
-{common_trigger_variables}
-
-      - choose:
-          - conditions:
-              - condition: trigger
-                id: problem
-            sequence:
-{problem_sequence}
-
-          - conditions:
-              - condition: trigger
-                id: problem_changed
-              - condition: template
-                value_template: >-
-                  {{{{ trigger.from_state is not none
-                     and trigger.to_state is not none
-                     and trigger.from_state.state == 'on'
-                     and trigger.to_state.state == 'on'
-                     and trigger.from_state.attributes.get('source_error_code') != trigger.to_state.attributes.get('source_error_code') }}}}
-            sequence:
-{problem_changed_sequence}
-
-          - conditions:
-              - condition: trigger
-                id: recovery
-            sequence:
-              - action: script.monitoring_notification_dismiss
-                data:
-                  notification_id: "{{{{ notification_id }}}}"
-                  notify_group: "{{{{ notification_target }}}}"
-
-'''
+def helper_object_id(prefix: str, entity_id: str) -> str:
+    return f"monitoring_{prefix}_{entity_id.split('.')[-1]}"
 
 
 def build_package(root: Path, private_dir: Path, output_path: Path) -> str:
@@ -688,17 +862,29 @@ def build_package(root: Path, private_dir: Path, output_path: Path) -> str:
         error_entities_path,
         required_attributes=("source_name", "source_description", "source_error_code"),
     )
+    availability_source_entities = read_template_binary_sensor_source_entities(availability_entities_path)
+    error_source_entities = read_template_binary_sensor_source_entities(error_entities_path)
 
     availability_entities = require_entity_list(groups_data, "monitoring_entity_availability", groups_path)
     error_entities = require_entity_list(groups_data, "monitoring_entity_errors", groups_path)
     notify_group = resolve_notify_group(input_text_data, input_text_path)
     language = resolve_language(input_select_data, input_select_path)
     translations = TRANSLATIONS[language]
+    availability_automation = render_availability_automation_data(
+        availability_entities,
+        notify_group,
+        translations,
+        availability_source_entities,
+    )
+    error_automation = render_error_automation_data(
+        error_entities,
+        notify_group,
+        translations,
+        error_source_entities,
+    )
 
-    availability_automation = render_availability_automation(availability_entities, notify_group, translations)
-    error_automation = render_error_automation(error_entities, notify_group, translations)
-
-    if not availability_automation and not error_automation:
+    automations = [automation for automation in (availability_automation, error_automation) if automation is not None]
+    if not automations:
         raise SystemExit("No monitoring automations were generated. At least one monitored entity group must contain entities.")
 
     source_inputs = "\n".join(
@@ -714,14 +900,30 @@ def build_package(root: Path, private_dir: Path, output_path: Path) -> str:
     output_dir = output_path.parent
     availability_include = relative_posix_path(availability_entities_path, output_dir)
     error_include = relative_posix_path(error_entities_path, output_dir)
+    sections = [
+        HEADER_TEMPLATE.substitute(source_inputs=source_inputs),
+        AUTOMATIONS_HEADER,
+        dump_yaml({"automation": automations}),
+        SCRIPTS_HEADER,
+        dump_yaml({"script": render_script_section_data()}),
+    ]
 
-    return MONITORING_TEMPLATE.substitute(
-        availability_automation=availability_automation,
-        error_automation=error_automation,
-        source_inputs=source_inputs,
-        availability_include=availability_include,
-        error_include=error_include,
+    input_boolean_section = render_input_boolean_section_data(availability_entities, error_entities)
+    if input_boolean_section:
+        sections.append(dump_yaml({"input_boolean": input_boolean_section}))
+
+    sections.append(dump_yaml({"input_text": render_input_text_section_data()}))
+    sections.append(
+        dump_yaml(
+            {
+                "template": render_template_section_data(
+                    availability_include,
+                    error_include,
+                )
+            }
+        )
     )
+    return "\n\n".join(sections).rstrip() + "\n"
 
 
 def write_if_changed(output_path: Path, content: str, check_only: bool) -> int:
